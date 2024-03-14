@@ -2,6 +2,7 @@ package parse
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"testing"
 
@@ -221,4 +222,22 @@ func TestSystemContextFromFlagSet(t *testing.T) {
 		DockerInsecureSkipTLSVerify: types.OptionalBoolFalse,
 		DockerRegistryUserAgent:     fmt.Sprintf("Buildah/%s", define.Version),
 	})
+}
+
+func TestContainerIgnoreFile_containerignore_over_dockerignore(t *testing.T) {
+	excludes, ignoreFile, err := ContainerIgnoreFile("/tmp/buildah/simple", "", []string{"Containerfile"})
+	assert.NoError(t, err)
+	assert.Equal(t, "/tmp/buildah/simple/.containerignore", ignoreFile)
+	assert.Equal(t, []string{"from .containerignore"}, excludes)
+}
+
+func TestContainerIgnoreFile_dot_containerfile_over_dot_dockerignore(t *testing.T) {
+	os.Mkdir("/tmp/buildah/", 0666)
+	os.WriteFile("/tmp/buildah/Containerfile", []byte("foo"), 0666)
+	os.WriteFile("/tmp/buildah/Containerfile.containerignore", []byte("from containerignore"), 0666)
+	os.WriteFile("/tmp/buildah/Containerfile.dockerignore", []byte("from dockerignore"), 0666)
+	excludes, ignoreFile, err := ContainerIgnoreFile("/tmp/buildah/", "", []string{"Containerfile"})
+	assert.NoError(t, err)
+	assert.Equal(t, "/tmp/buildah/Containerfile.containerignore", ignoreFile)
+	assert.Equal(t, []string{"from containerignore"}, excludes)
 }
